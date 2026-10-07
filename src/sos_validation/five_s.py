@@ -35,6 +35,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
+
 from .sos import SosCase, SosResult, run
 
 #: Surface albedos to invert over.  Zero isolates ``rho_atm``; the rest

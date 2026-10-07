@@ -23,7 +23,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 import numpy as np
-
 from adjeff.atmosphere.atmo_factory import grids
 
 #: The wavelength adjeff refers its AOT to, from

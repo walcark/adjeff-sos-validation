@@ -35,6 +35,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 import numpy as np
+
 from .optics import AerosolOptics
 
 #: Where `scripts/build_sos.sh` puts the clone and the executable.
@@ -223,9 +224,7 @@ def executable() -> Path:
     """
     exe = SOS_ROOT / "exe" / "SOS_ABS_MAIN.exe"
     if not exe.is_file():
-        raise SosError(
-            f"{exe} is missing; run `pixi run build-sos` (or set SOS_ROOT)."
-        )
+        raise SosError(f"{exe} is missing; run `pixi run build-sos` (or set SOS_ROOT).")
     return exe
 
 

@@ -16,7 +16,6 @@ from __future__ import annotations
 
 import numpy as np
 import xarray as xr
-
 from adjeff.atmosphere import AtmoConfig, GeoConfig, SpectralConfig
 from adjeff.core import ImageDict, SensorBand
 from adjeff.modules.samplers import RadiativePipeline
