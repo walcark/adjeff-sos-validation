@@ -101,3 +101,14 @@ def test_the_report_states_the_relative_differences():
     assert "| 0.1 | +1.00 | +1.00 | +1.00 | +1.00 | +1.00 | +1.00 | 0.2000 |" in text
     assert "## aerosol" in text
     assert "0.50%" in text
+
+
+def test_the_figures_draw_from_points():
+    """The three figures render from report points, with one panel per term."""
+    from sos_validation import plots
+
+    points = [point(0.1, 1.01), point(0.2, 1.0)]
+
+    assert len(plots.scatter(points).axes) == len(QUANTITIES)
+    assert len(plots.by_sweep(points).axes) == len(QUANTITIES)
+    assert len(plots.distribution(points).axes) == 1
