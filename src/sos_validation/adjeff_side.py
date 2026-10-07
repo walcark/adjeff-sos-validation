@@ -20,15 +20,7 @@ from adjeff.atmosphere import AtmoConfig, GeoConfig, SpectralConfig
 from adjeff.core import ImageDict, SensorBand
 from adjeff.modules.samplers import RadiativePipeline
 
-#: The six quantities a forward run produces.
-QUANTITIES = (
-    "tdir_down",
-    "tdif_down",
-    "tdir_up",
-    "tdif_up",
-    "rho_atm",
-    "sph_alb",
-)
+from .five_s import QUANTITIES
 
 
 def run(

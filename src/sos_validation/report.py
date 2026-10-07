@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from .adjeff_side import QUANTITIES
+from .five_s import QUANTITIES
 from .sos import TDIF_QUANTUM_FLUX, TDIF_QUANTUM_TRANS
 
 if TYPE_CHECKING:

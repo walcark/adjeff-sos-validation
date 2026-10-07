@@ -38,6 +38,16 @@ import numpy as np
 
 from .sos import SosCase, SosResult, run
 
+#: The six quantities of the 5S model, under the names adjeff writes.
+QUANTITIES = (
+    "tdir_down",
+    "tdif_down",
+    "tdir_up",
+    "tdif_up",
+    "rho_atm",
+    "sph_alb",
+)
+
 #: Surface albedos to invert over.  Zero isolates ``rho_atm``; the rest
 #: span the range a land scene reaches, and being spread out is what
 #: conditions the fit.

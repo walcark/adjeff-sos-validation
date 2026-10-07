@@ -42,8 +42,7 @@ import xarray as xr
 from adjeff.core import S2Band
 
 from . import adjeff_side, atmosphere, sos
-from .adjeff_side import QUANTITIES
-from .five_s import FiveS, five_s
+from .five_s import QUANTITIES, FiveS, five_s
 from .optics import AerosolOptics
 from .report import report
 
