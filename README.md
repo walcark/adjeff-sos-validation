@@ -31,6 +31,19 @@ height) over three atmospheres (molecules only, aerosol only, both). The
 full tables are in [`results/report.md`](results/report.md), every number
 in [`results/report.json`](results/report.json).
 
+![adjeff against SOS, one panel per term](results/figures/sos_vs_adjeff.png)
+
+Every point lies on `y = x`. The relative differences, over all 339
+comparisons above the 0.01 floor:
+
+![Distribution of the relative differences per term](results/figures/relative_distribution.png)
+
+And against each swept parameter, where the ~1 % on `rho_atm` in a
+mixture shows up flat across AOT and angles, and vanishes at a scale
+height of 8 km (see [Reading the numbers](#reading-the-numbers)):
+
+![Relative difference against each swept parameter](results/figures/relative_by_sweep.png)
+
 ## Running it
 
 Needs a CUDA GPU for adjeff and the Smart-G auxiliary data.
@@ -39,9 +52,13 @@ Needs a CUDA GPU for adjeff and the Smart-G auxiliary data.
 pixi install
 pixi run build-sos                 # clone and compile SOS, once
 export SMARTG_DIR_AUXDATA=/path/to/smartg/auxdata
-pixi run validate                  # about 30 minutes; writes results/
+pixi run validate                  # about 30 minutes; writes results/report.*
 pixi run validate --sweeps aot --atmospheres aerosol
+pixi run plots                     # results/figures/, from results/report.json
 ```
+
+`plots` needs no GPU: it redraws the figures from any `report.json`
+(`--report`, `--out`).
 
 `build-sos` clones into `~/.cache/adjeff/sos`, or `SOS_ROOT`. The clone
 weighs 4.4 GB, 3.5 GB of which is an absorption database this validation
@@ -109,6 +126,8 @@ printed one) are reported as checks.
 | `sos_validation/adjeff_side.py` | The six terms from adjeff's `RadiativePipeline` |
 | `sos_validation/validate.py` | The sweeps and the command line |
 | `sos_validation/report.py` | The Markdown report |
+| `sos_validation/plots.py` | The figures |
+| `results/` | `report.md`, `report.json` and `figures/` of the last run |
 
 ## License
 
