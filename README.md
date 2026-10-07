@@ -58,7 +58,8 @@ pixi run plots                     # results/figures/, from results/report.json
 ```
 
 `plots` needs no GPU: it redraws the figures from any `report.json`
-(`--report`, `--out`).
+(`--report`, `--out`), in the [SciencePlots](https://github.com/garrettj403/SciencePlots)
+`science` style.
 
 `build-sos` clones into `~/.cache/adjeff/sos`, or `SOS_ROOT`. The clone
 weighs 4.4 GB, 3.5 GB of which is an absorption database this validation

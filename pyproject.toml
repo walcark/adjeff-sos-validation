@@ -7,7 +7,7 @@ readme = "README.md"
 license = "Apache-2.0"
 license-files = ["LICENSE"]
 requires-python = ">=3.11,<3.13"
-dependencies = ["adjeff", "matplotlib", "numpy", "xarray"]
+dependencies = ["adjeff", "matplotlib", "numpy", "scienceplots", "xarray"]
 
 [project.scripts]
 sos-validate = "sos_validation.validate:main"
@@ -26,6 +26,8 @@ sos-validation = { path = ".", editable = true }
 adjeff = { git = "https://github.com/walcark/Adjeff.git", tag = "v0.15.0" }
 # Smart-G 2.0 is on PyPI only.
 smartg = ">=2.0.1,<3"
+# The figure styles.
+scienceplots = ">=2.1"
 
 # adjeff's conda-only dependencies, which installing it from git does not
 # bring: luts and geoclide are not on PyPI, and pycuda's sdist needs the
@@ -37,7 +39,8 @@ luts = ">=1.0.6,<2"
 pycuda = "*"
 numpy = ">=2.0"
 xarray = ">=2026.1.0"
-matplotlib-base = ">=3.9"
+# scienceplots relies on style helpers matplotlib 3.13 removes.
+matplotlib-base = ">=3.9,<3.13"
 # Compiles SOS.
 gfortran = "*"
 make = "*"

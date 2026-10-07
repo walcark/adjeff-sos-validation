@@ -20,7 +20,9 @@ Usage
 from __future__ import annotations
 
 import argparse
+import functools
 import json
+from collections.abc import Callable
 from pathlib import Path
 
 import matplotlib
@@ -29,18 +31,25 @@ matplotlib.use("Agg")
 
 import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
+import scienceplots  # noqa: E402, F401  (registers the styles)
 from matplotlib.figure import Figure  # noqa: E402
 from matplotlib.lines import Line2D  # noqa: E402
 
 from .five_s import QUANTITIES  # noqa: E402
 from .report import FLOOR, Point  # noqa: E402
 
-#: Atmosphere to ``(label, colour, marker)``.  Colour and shape both
-#: carry identity, so the figures read in greyscale and for any vision.
+#: The SciencePlots sheets.  ``no-latex`` spares a TeX install; drop it
+#: for TeX-rendered text.
+SHEETS = ["science", "no-latex"]
+
+#: Atmosphere to ``(label, colour, marker)``, colours from SciencePlots'
+#: ``vibrant``.  Colour and shape both carry identity, so the figures read
+#: in greyscale and for any vision; markers are hollow, so overlapping
+#: points of different atmospheres stay visible.
 STYLE = {
-    "rayleigh": ("Molecules only", "#2a78d6", "o"),
-    "aerosol": ("Aerosol only", "#eb6834", "s"),
-    "both": ("Molecules and aerosol", "#1baf7a", "D"),
+    "rayleigh": ("Molecules only", "#0077BB", "o"),
+    "aerosol": ("Aerosol only", "#EE7733", "s"),
+    "both": ("Molecules and aerosol", "#EE3377", "D"),
 }
 
 #: Sweep to its axis label.
@@ -59,28 +68,7 @@ LIMIT = 3.0
 
 INK = "#0b0b0b"
 MUTED = "#52514e"
-GRID = "#e4e3df"
-BAND = "#efeeea"
-
-plt.rcParams.update(
-    {
-        "figure.facecolor": "#fcfcfb",
-        "axes.facecolor": "#fcfcfb",
-        "axes.edgecolor": MUTED,
-        "axes.labelcolor": INK,
-        "axes.titlecolor": INK,
-        "axes.spines.top": False,
-        "axes.spines.right": False,
-        "axes.grid": True,
-        "grid.color": GRID,
-        "grid.linewidth": 0.8,
-        "xtick.color": MUTED,
-        "ytick.color": MUTED,
-        "font.size": 10,
-        "savefig.dpi": 150,
-        "savefig.bbox": "tight",
-    }
-)
+BAND = "#ebebeb"
 
 
 def load(path: Path) -> list[Point]:
@@ -88,93 +76,107 @@ def load(path: Path) -> list[Point]:
     return [Point(**entry) for entry in json.loads(path.read_text())]
 
 
+def _styled(draw: Callable[[list[Point]], Figure]) -> Callable[[list[Point]], Figure]:
+    """Draw *draw*'s figure under the SciencePlots `SHEETS`."""
+
+    @functools.wraps(draw)
+    def wrapper(points: list[Point]) -> Figure:
+        with plt.style.context(SHEETS):
+            return draw(points)
+
+    return wrapper
+
+
 def _meaningful(point: Point, quantity: str) -> bool:
     """Return whether SOS is far enough from zero for a relative difference."""
     return abs(point.sos[quantity]) > FLOOR
 
 
-def _legend(fig: Figure, atmospheres: list[str]) -> None:
-    """Add the atmosphere legend above the panels."""
-    handles = [
-        Line2D(
-            [],
-            [],
-            linestyle="",
-            marker=STYLE[a][2],
-            color=STYLE[a][1],
-            markeredgecolor="white",
-            markersize=8,
-            label=STYLE[a][0],
-        )
-        for a in atmospheres
-    ]
+def _hollow(atmosphere: str, size: float) -> dict:
+    """Return the keywords of an atmosphere's hollow marker for `Axes.plot`."""
+    _, colour, marker = STYLE[atmosphere]
+    return {
+        "linestyle": "",
+        "marker": marker,
+        "markersize": size,
+        "markerfacecolor": "none",
+        "markeredgecolor": colour,
+        "markeredgewidth": 1.3,
+    }
+
+
+def _legend(fig: Figure, atmospheres: list[str], filled: bool = False) -> None:
+    """Add the atmosphere legend above the panels, with the figure's markers."""
+    handles = []
+    for a in atmospheres:
+        marker = _hollow(a, 7)
+        if filled:
+            marker["markerfacecolor"] = marker["markeredgecolor"]
+        handles.append(Line2D([], [], label=STYLE[a][0], **marker))
     fig.legend(
         handles=handles,
-        loc="upper center",
+        loc="lower center",
         ncol=len(handles),
         frameon=False,
         bbox_to_anchor=(0.5, 1.0),
+        fontsize=10,
     )
 
 
+@_styled
 def scatter(points: list[Point]) -> Figure:
-    """Return adjeff against SOS, one panel per quantity, with ``y = x``."""
+    """Return adjeff against SOS, one panel per quantity, with ``y = x``.
+
+    Each atmosphere gets its own marker size, largest first, so markers
+    that overlap on ``y = x`` nest instead of hiding each other.
+    """
     atmospheres = [a for a in STYLE if any(p.atmosphere == a for p in points)]
-    fig, axes = plt.subplots(2, 3, figsize=(12, 8.2))
+    sizes = dict(zip(atmospheres, (9.5, 6.5, 4.0), strict=False))
+    fig, axes = plt.subplots(2, 3, figsize=(10, 6.8))
     for ax, q in zip(axes.flat, QUANTITIES, strict=True):
         sos = np.array([p.sos[q] for p in points])
         adj = np.array([p.adjeff[q] for p in points])
         low, high = min(sos.min(), adj.min()), max(sos.max(), adj.max())
         pad = 0.05 * (high - low)
-        ax.plot(
-            [low - pad, high + pad], [low - pad, high + pad], color=MUTED, lw=1, ls="--"
-        )
+        edges = [low - pad, high + pad]
+        ax.plot(edges, edges, color=MUTED, lw=0.8, ls="--", zorder=1)
         for a in atmospheres:
             mine = [p for p in points if p.atmosphere == a]
-            ax.scatter(
+            ax.plot(
                 [p.sos[q] for p in mine],
                 [p.adjeff[q] for p in mine],
-                marker=STYLE[a][2],
-                s=42,
-                color=STYLE[a][1],
-                edgecolors="white",
-                linewidths=1.0,
                 zorder=3,
+                **_hollow(a, sizes[a]),
             )
-        ax.set_xlim(low - pad, high + pad)
-        ax.set_ylim(low - pad, high + pad)
+        ax.set_xlim(edges)
+        ax.set_ylim(edges)
         ax.set_aspect("equal")
-        ax.set_title(f"`{q}`".strip("`"), fontsize=11, loc="left")
+        ax.set_title(q, fontsize=11)
         ax.set_xlabel("SOS")
         ax.set_ylabel("adjeff")
 
         rel = [abs(p.relative(q)) for p in points if _meaningful(p, q)]
         if rel:
             ax.text(
-                0.97,
-                0.04,
+                0.96,
+                0.05,
                 f"median {np.median(rel) * 100:.2f} %\nworst {max(rel) * 100:.2f} %",
                 transform=ax.transAxes,
                 ha="right",
                 va="bottom",
                 color=MUTED,
-                fontsize=9,
+                fontsize=8.5,
             )
-    _legend(fig, atmospheres)
-    fig.suptitle(
-        "adjeff against SOS on the six 5S terms",
-        y=1.04,
-        fontsize=13,
-        color=INK,
-    )
     fig.tight_layout()
+    _legend(fig, atmospheres)
     return fig
 
 
+@_styled
 def by_sweep(points: list[Point]) -> Figure:
     """Return the relative difference against each swept parameter.
 
-    Rows are quantities, columns sweeps.  Hollow markers are points where
+    Rows are quantities, columns sweeps.  Faded markers are points where
     SOS gives less than `FLOOR`, whose relative difference means little.
     """
     sweeps = [s for s in SWEEP_LABELS if any(p.sweep == s for p in points)]
@@ -182,7 +184,7 @@ def by_sweep(points: list[Point]) -> Figure:
     fig, axes = plt.subplots(
         len(QUANTITIES),
         len(sweeps),
-        figsize=(2.9 * len(sweeps), 1.9 * len(QUANTITIES)),
+        figsize=(2.7 * len(sweeps), 1.7 * len(QUANTITIES)),
         sharey=True,
         sharex="col",
         squeeze=False,
@@ -191,7 +193,7 @@ def by_sweep(points: list[Point]) -> Figure:
         for col, sweep in enumerate(sweeps):
             ax = axes[row, col]
             ax.axhspan(-1.0, 1.0, color=BAND, zorder=0, lw=0)
-            ax.axhline(0.0, color=MUTED, lw=0.8, zorder=1)
+            ax.axhline(0.0, color=MUTED, lw=0.6, zorder=1)
             for a in atmospheres:
                 mine = sorted(
                     (p for p in points if p.sweep == sweep and p.atmosphere == a),
@@ -199,11 +201,11 @@ def by_sweep(points: list[Point]) -> Figure:
                 )
                 if not mine:
                     continue
-                label, colour, marker = STYLE[a]
+                _, colour, marker = STYLE[a]
                 x = np.array([p.value for p in mine])
                 y = np.array([p.relative(q) * 100 for p in mine])
                 shown = np.clip(y, -LIMIT, LIMIT)
-                ax.plot(x, shown, color=colour, lw=1.5, zorder=2)
+                ax.plot(x, shown, color=colour, lw=1.0, zorder=2)
                 for xi, yi, si, p in zip(x, y, shown, mine, strict=True):
                     clipped = yi != si
                     ax.plot(
@@ -211,89 +213,70 @@ def by_sweep(points: list[Point]) -> Figure:
                         si,
                         linestyle="",
                         marker=("^" if yi > 0 else "v") if clipped else marker,
-                        markersize=6.5,
+                        markersize=4.5,
                         color=colour,
-                        markerfacecolor=colour if _meaningful(p, q) else "white",
-                        markeredgecolor=colour,
+                        alpha=1.0 if _meaningful(p, q) else 0.3,
                         zorder=3,
                     )
             ax.set_ylim(-LIMIT - 0.3, LIMIT + 0.3)
             ax.set_yticks([-3, -2, -1, 0, 1, 2, 3])
             if row == 0:
-                ax.set_title(SWEEP_LABELS[sweep], fontsize=10)
+                ax.set_title(SWEEP_LABELS[sweep], fontsize=9)
             if col == 0:
-                ax.set_ylabel(f"{q}\n(%)")
-    _legend(fig, atmospheres)
-    fig.suptitle(
-        "Relative difference (adjeff − SOS) / SOS, against each swept parameter",
-        y=1.02,
-        fontsize=13,
-        color=INK,
-    )
+                ax.set_ylabel(f"{q} (%)")
+    fig.tight_layout(rect=(0, 0.02, 1, 1))
     fig.text(
         0.5,
-        -0.01,
-        "Shaded: ±1 %.  Hollow: SOS below "
+        0.0,
+        "(adjeff − SOS) / SOS.  Shaded: ±1 %.  Faded: SOS below "
         f"{FLOOR}, where its printed decimals limit the comparison.  "
         f"Triangles: beyond ±{LIMIT:g} %, drawn on the edge.",
         ha="center",
+        va="bottom",
         color=MUTED,
-        fontsize=9,
+        fontsize=8,
     )
-    fig.tight_layout(rect=(0, 0, 1, 0.98))
+    _legend(fig, atmospheres, filled=True)
     return fig
 
 
+@_styled
 def distribution(points: list[Point]) -> Figure:
     """Return the relative differences of each quantity, over every point.
 
     Only points where SOS gives more than `FLOOR` are kept.
     """
     atmospheres = [a for a in STYLE if any(p.atmosphere == a for p in points)]
-    fig, ax = plt.subplots(figsize=(10, 4.6))
+    fig, ax = plt.subplots(figsize=(8, 3.6))
     ax.axhspan(-1.0, 1.0, color=BAND, zorder=0, lw=0)
-    ax.axhline(0.0, color=MUTED, lw=0.8, zorder=1)
+    ax.axhline(0.0, color=MUTED, lw=0.6, zorder=1)
     rng = np.random.default_rng(0)
-    every = []
     for i, q in enumerate(QUANTITIES):
         kept = [p for p in points if _meaningful(p, q)]
-        values = [p.relative(q) * 100 for p in kept]
-        every += [abs(v) for v in values]
         ax.boxplot(
-            values,
+            [p.relative(q) * 100 for p in kept],
             positions=[i],
             widths=0.5,
             showfliers=False,
-            patch_artist=True,
-            boxprops={"facecolor": "white", "edgecolor": MUTED},
-            medianprops={"color": INK, "lw": 1.5},
+            boxprops={"color": MUTED},
+            medianprops={"color": INK, "lw": 1.3},
             whiskerprops={"color": MUTED},
             capprops={"color": MUTED},
             zorder=2,
         )
         for a in atmospheres:
             mine = [p.relative(q) * 100 for p in kept if p.atmosphere == a]
-            ax.scatter(
+            ax.plot(
                 i + rng.uniform(-0.18, 0.18, len(mine)),
                 mine,
-                marker=STYLE[a][2],
-                s=22,
-                color=STYLE[a][1],
-                edgecolors="white",
-                linewidths=0.6,
                 zorder=3,
+                **_hollow(a, 4.0),
             )
     ax.set_xticks(range(len(QUANTITIES)), QUANTITIES)
+    ax.tick_params(axis="x", which="minor", bottom=False, top=False)
     ax.set_ylabel("(adjeff − SOS) / SOS (%)")
-    ax.grid(axis="x", visible=False)
-    _legend(fig, atmospheres)
-    fig.suptitle(
-        f"Median |difference| over {len(every)} comparisons: {np.median(every):.2f} %",
-        y=1.04,
-        fontsize=13,
-        color=INK,
-    )
     fig.tight_layout()
+    _legend(fig, atmospheres)
     return fig
 
 
@@ -312,7 +295,7 @@ def main() -> None:
         ("relative_distribution", distribution),
     ):
         path = args.out / f"{name}.png"
-        draw(points).savefig(path)
+        draw(points).savefig(path, dpi=200, bbox_inches="tight")
         print(f"wrote {path}")
 
 
