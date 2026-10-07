@@ -16,4 +16,6 @@ Modules
         The sweeps, the comparison and the command line.
     report
         The Markdown report.
+    plots
+        The figures.
 """

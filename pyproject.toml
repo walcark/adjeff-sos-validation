@@ -7,10 +7,11 @@ readme = "README.md"
 license = "Apache-2.0"
 license-files = ["LICENSE"]
 requires-python = ">=3.11,<3.13"
-dependencies = ["adjeff", "numpy", "xarray"]
+dependencies = ["adjeff", "matplotlib", "numpy", "xarray"]
 
 [project.scripts]
 sos-validate = "sos_validation.validate:main"
+sos-plots = "sos_validation.plots:main"
 
 [build-system]
 build-backend = "hatchling.build"
@@ -36,6 +37,7 @@ luts = ">=1.0.6,<2"
 pycuda = "*"
 numpy = ">=2.0"
 xarray = ">=2026.1.0"
+matplotlib-base = ">=3.9"
 # Compiles SOS.
 gfortran = "*"
 make = "*"
@@ -59,6 +61,7 @@ cpu = ["cpu", "dev"]
 [tool.pixi.tasks]
 build-sos = { cmd = "bash scripts/build_sos.sh" }
 validate = { cmd = "sos-validate" }
+plots = { cmd = "sos-plots" }
 
 [tool.pixi.feature.dev.tasks]
 test = { cmd = "pytest" }
