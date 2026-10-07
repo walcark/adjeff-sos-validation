@@ -44,7 +44,7 @@ from adjeff.core import S2Band
 from . import adjeff_side, atmosphere, sos
 from .five_s import QUANTITIES, FiveS, five_s
 from .optics import AerosolOptics
-from .report import report
+from .report import Point, report
 
 #: Sentinel-2 bands the wavelength sweep runs over.  In adjeff a
 #: wavelength is a property of the band, so a wavelength sweep is a band
@@ -101,57 +101,6 @@ SKIP: set[tuple[str, str]] = {
 #: Photons per Monte-Carlo sampler: a tenth of adjeff's default, which
 #: puts the noise near 0.1 percent and a full run under an hour.
 N_PHOTONS = int(2e6)
-
-
-@dataclass
-class Point:
-    """One geometry and atmosphere, as both codes answered it.
-
-    Attributes
-    ----------
-    sweep, atmosphere : str
-        Keys of `SWEEPS` and `ATMOSPHERES`.
-    varied : str
-        Name of the varied parameter.
-    value : float
-        Its value at this point.
-    tau_sos, tau_adjeff : float
-        Total optical depth each code used; forced equal.
-    sos, adjeff : dict
-        The six quantities.
-    sca_ang_sos, sca_ang_geometry : float
-        Scattering angle SOS states, and the one the geometry implies in
-        adjeff's convention: their agreement checks the azimuth mapping.
-    inversion_residual : float
-        Departure of the SOS albedo runs from the 5S line.
-    two_way_gap : float
-        Relative gap between the inverted and the printed two-way
-        transmittance.
-    """
-
-    sweep: str
-    atmosphere: str
-    varied: str
-    value: float
-    tau_sos: float
-    tau_adjeff: float
-    sos: dict[str, float]
-    adjeff: dict[str, float]
-    sca_ang_sos: float
-    sca_ang_geometry: float
-    inversion_residual: float
-    two_way_gap: float
-
-    def absolute(self, quantity: str) -> float:
-        """Return ``adjeff - sos`` on *quantity*."""
-        return self.adjeff[quantity] - self.sos[quantity]
-
-    def relative(self, quantity: str) -> float:
-        """Return ``(adjeff - sos) / sos`` on *quantity*, ``nan`` if SOS is 0."""
-        reference = self.sos[quantity]
-        if reference == 0.0:
-            return float("nan")
-        return (self.adjeff[quantity] - reference) / reference
 
 
 def sos_point(
