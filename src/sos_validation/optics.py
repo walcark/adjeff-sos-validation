@@ -34,12 +34,7 @@ SOS_MAX_ANGLES = 200
 
 
 def auxdata_mixtures() -> Path:
-    """Return the directory Smart-G reads OPAC mixtures from.
-
-    Returns
-    -------
-    Path
-        ``$SMARTG_DIR_AUXDATA/aerosols/OPAC/mixtures``.
+    """Return ``$SMARTG_DIR_AUXDATA/aerosols/OPAC/mixtures``.
 
     Raises
     ------
@@ -194,18 +189,6 @@ class AerosolOptics:
             **{k: v * scale for (k, v) in terms.items()},
         )
 
-    def normalisation(self) -> float:
-        """Return ``(1/2) * integral F11 dmu``, which SOS expects to be 1.
-
-        Returns
-        -------
-        float
-            One for a correctly normalised phase function.  Departure
-            from one measures what the resampling onto `theta` cost.
-        """
-        mu = np.cos(np.deg2rad(self.theta))
-        return float(0.5 * abs(np.trapezoid(self.f11, mu)))
-
     def write_sos_extdata(self, path: Path) -> Path:
         """Write the file ``-AER.ExtData`` reads.
 
@@ -214,15 +197,7 @@ class AerosolOptics:
         the second column is SOS's own convention, stated in
         ``SOS_AEROSOLS.F``: it reads a ratio ``-F12/F11``.
 
-        Parameters
-        ----------
-        path : Path
-            File to write.
-
-        Returns
-        -------
-        Path
-            The path written, for chaining.
+        Returns *path*, for chaining.
         """
         path.parent.mkdir(parents=True, exist_ok=True)
         rows = "\n".join(
@@ -251,21 +226,8 @@ def _interp_axis(
 ) -> NDArray[np.float64]:
     """Linearly interpolate *values* along *axis*, clamped at both ends.
 
-    Parameters
-    ----------
-    values : NDArray
-        Array to interpolate.
-    grid : NDArray
-        Coordinate of *axis*, increasing.
-    at : float
-        Where to interpolate.
-    axis : int
-        Axis to collapse.
-
-    Returns
-    -------
-    NDArray
-        *values* with *axis* removed.
+    *grid* is the increasing coordinate of *axis*, and *axis* is
+    collapsed out of the result.
     """
     index = float(np.interp(at, grid, np.arange(grid.size)))
     low = int(np.floor(index))

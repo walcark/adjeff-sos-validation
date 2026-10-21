@@ -20,9 +20,7 @@ Usage
 from __future__ import annotations
 
 import argparse
-import functools
 import json
-from collections.abc import Callable
 from pathlib import Path
 
 import matplotlib
@@ -36,11 +34,13 @@ from matplotlib.figure import Figure  # noqa: E402
 from matplotlib.lines import Line2D  # noqa: E402
 
 from .five_s import QUANTITIES  # noqa: E402
-from .report import FLOOR, Point  # noqa: E402
+from .report import FLOOR, Point, meaningful  # noqa: E402
 
 #: The SciencePlots sheets.  ``no-latex`` spares a TeX install; drop it
-#: for TeX-rendered text.
+#: for TeX-rendered text.  Set for the module: every figure here is
+#: drawn in this style, and nothing else imports this one.
 SHEETS = ["science", "no-latex"]
+plt.style.use(SHEETS)
 
 #: Atmosphere to ``(label, colour, marker)``, colours from SciencePlots'
 #: ``vibrant``.  Colour and shape both carry identity, so the figures read
@@ -76,22 +76,6 @@ def load(path: Path) -> list[Point]:
     return [Point(**entry) for entry in json.loads(path.read_text())]
 
 
-def _styled(draw: Callable[[list[Point]], Figure]) -> Callable[[list[Point]], Figure]:
-    """Draw *draw*'s figure under the SciencePlots `SHEETS`."""
-
-    @functools.wraps(draw)
-    def wrapper(points: list[Point]) -> Figure:
-        with plt.style.context(SHEETS):
-            return draw(points)
-
-    return wrapper
-
-
-def _meaningful(point: Point, quantity: str) -> bool:
-    """Return whether SOS is far enough from zero for a relative difference."""
-    return abs(point.sos[quantity]) > FLOOR
-
-
 def _hollow(atmosphere: str, size: float) -> dict:
     """Return the keywords of an atmosphere's hollow marker for `Axes.plot`."""
     _, colour, marker = STYLE[atmosphere]
@@ -123,7 +107,6 @@ def _legend(fig: Figure, atmospheres: list[str], filled: bool = False) -> None:
     )
 
 
-@_styled
 def scatter(points: list[Point]) -> Figure:
     """Return adjeff against SOS, one panel per quantity, with ``y = x``.
 
@@ -155,7 +138,7 @@ def scatter(points: list[Point]) -> Figure:
         ax.set_xlabel("SOS")
         ax.set_ylabel("adjeff")
 
-        rel = [abs(p.relative(q)) for p in points if _meaningful(p, q)]
+        rel = [abs(p.relative(q)) for p in points if meaningful(p, q)]
         if rel:
             ax.text(
                 0.96,
@@ -172,7 +155,6 @@ def scatter(points: list[Point]) -> Figure:
     return fig
 
 
-@_styled
 def by_sweep(points: list[Point]) -> Figure:
     """Return the relative difference against each swept parameter.
 
@@ -215,7 +197,7 @@ def by_sweep(points: list[Point]) -> Figure:
                         marker=("^" if yi > 0 else "v") if clipped else marker,
                         markersize=4.5,
                         color=colour,
-                        alpha=1.0 if _meaningful(p, q) else 0.3,
+                        alpha=1.0 if meaningful(p, q) else 0.3,
                         zorder=3,
                     )
             ax.set_ylim(-LIMIT - 0.3, LIMIT + 0.3)
@@ -240,7 +222,6 @@ def by_sweep(points: list[Point]) -> Figure:
     return fig
 
 
-@_styled
 def distribution(points: list[Point]) -> Figure:
     """Return the relative differences of each quantity, over every point.
 
@@ -252,7 +233,7 @@ def distribution(points: list[Point]) -> Figure:
     ax.axhline(0.0, color=MUTED, lw=0.6, zorder=1)
     rng = np.random.default_rng(0)
     for i, q in enumerate(QUANTITIES):
-        kept = [p for p in points if _meaningful(p, q)]
+        kept = [p for p in points if meaningful(p, q)]
         ax.boxplot(
             [p.relative(q) * 100 for p in kept],
             positions=[i],

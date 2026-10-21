@@ -48,41 +48,14 @@ SOS_ROOT = Path(os.environ.get("SOS_ROOT", Path.home() / ".cache/adjeff/sos"))
 #: against ``CTE_OS_NS_MAX``, which ships at 136.  This is the
 #: resolution SOS projects the phase function onto, so it sets the floor
 #: on how well a forward peak can agree with Smart-G's 2000-point table.
-#: `set_gauss` moves it, which is how the comparison tells its own
+#: ``--gauss`` moves it, which is how the comparison tells its own
 #: resolution from a real disagreement.
 N_GAUSS_RAD = 40
 N_GAUSS_AER = 40
 
-#: What the shipped ``inc/SOS.h`` actually allows.
-MAX_GAUSS_RAD = 68
-MAX_GAUSS_AER = 100
-
-
-def set_gauss(radiance: int, aerosol: int) -> None:
-    """Change the Gauss angle counts for subsequent runs.
-
-    Parameters
-    ----------
-    radiance : int
-        Angles for the radiance field, at most `MAX_GAUSS_RAD`.
-    aerosol : int
-        Angles for the phase matrix, at most 100.
-
-    Raises
-    ------
-    ValueError
-        Beyond what SOS was compiled for, where it would overrun its
-        own tables rather than refuse.
-    """
-    global N_GAUSS_RAD, N_GAUSS_AER
-    if not 1 <= radiance <= MAX_GAUSS_RAD or not 1 <= aerosol <= MAX_GAUSS_AER:
-        raise ValueError(
-            f"SOS allows at most {MAX_GAUSS_RAD} radiance and "
-            f"{MAX_GAUSS_AER} aerosol Gauss angles, got {radiance} and "
-            f"{aerosol}; beyond that it stops on ERROR_4000 rather than "
-            "overrunning its tables"
-        )
-    N_GAUSS_RAD, N_GAUSS_AER = radiance, aerosol
+#: What the shipped ``inc/SOS.h`` allows for the radiance field; the
+#: phase matrix allows 100, which is never the binding limit.
+MAX_GAUSS = 68
 
 
 #: Rounding step of the diffuse transmittances SOS prints.  The
@@ -136,13 +109,6 @@ class SosCase:
     mol_scale_height : float
         Molecular scale height, in km.  8 km is what
         ``afgl_exp_h8km`` uses on the adjeff side.
-    truncate : bool
-        Let SOS truncate the forward peak of the phase function.  Off by
-        default: truncation renormalises the optical depth with the peak,
-        so ``tdir`` would no longer be ``exp(-tau/mu)`` for the ``tau``
-        the comparison declares.  Turning it on is how the Legendre
-        reconstruction of an untruncated peak is told from a real
-        disagreement on ``rho_atm``.
     """
 
     wl_nm: float
@@ -155,7 +121,6 @@ class SosCase:
     raa: float = 180.0
     aer_scale_height: float = 2.0
     mol_scale_height: float = 8.0
-    truncate: bool = False
 
 
 @dataclass
@@ -178,10 +143,10 @@ class SosResult:
     sca_ang : dict
         Scattering angle SOS states for each viewing angle, in degrees.
         Kept so the azimuth convention is checked rather than assumed.
-    flux_down_direct, flux_down_diffuse : float
-        Downward fluxes at the surface, normalised by the TOA solar flux.
-    flux_up_diffuse : float
-        Upward diffuse flux at TOA, same normalisation.
+    flux_down_diffuse : float
+        Downward diffuse flux at the surface, normalised by the TOA
+        solar flux.  SOS prints it to one more decimal than the
+        transmission file does, so it is what `tdif_down` is read from.
     """
 
     tau: float
@@ -190,9 +155,7 @@ class SosResult:
     tdif_up: dict[float, float] = field(default_factory=dict)
     rho_toa: dict[float, float] = field(default_factory=dict)
     sca_ang: dict[float, float] = field(default_factory=dict)
-    flux_down_direct: float = float("nan")
     flux_down_diffuse: float = float("nan")
-    flux_up_diffuse: float = float("nan")
 
     def tdir_up(self, vza: float) -> float:
         """Return the direct upward transmittance at *vza*.
@@ -200,28 +163,12 @@ class SosResult:
         SOS does not print it, and it needs no model: a beam leaving the
         surface at *vza* is attenuated by ``exp(-tau / cos(vza))``, with
         the same ``tau`` SOS reports for the profile.
-
-        Parameters
-        ----------
-        vza : float
-            Viewing zenith angle, in degrees.
-
-        Returns
-        -------
-        float
-            The direct upward transmittance.
         """
         return float(np.exp(-self.tau / np.cos(np.deg2rad(vza))))
 
 
 def executable() -> Path:
-    """Return the SOS executable, raising if it has not been built.
-
-    Returns
-    -------
-    Path
-        Path to ``SOS_ABS_MAIN.exe``.
-    """
+    """Return ``SOS_ABS_MAIN.exe``, raising if it has not been built."""
     exe = SOS_ROOT / "exe" / "SOS_ABS_MAIN.exe"
     if not exe.is_file():
         raise SosError(f"{exe} is missing; run `pixi run build-sos` (or set SOS_ROOT).")
@@ -258,92 +205,60 @@ def run(case: SosCase, workdir: Path) -> SosResult:
     angles = workdir / "user_angles.txt"
     angles.write_text("".join(f"{v:.6f}\n" for v in sorted(case.vza)))
 
-    argv = [
-        str(executable()),
-        "-SOS_Main.Wa",
-        f"{case.wl_nm / 1000.0:.6f}",
-        "-SOS_Main.ResRoot",
-        str(workdir),
-        "-SOS_Main.Log",
-        "main.log",
-        "-ANG.Rad.NbGauss",
-        str(N_GAUSS_RAD),
-        "-ANG.Aer.NbGauss",
-        str(N_GAUSS_AER),
-        "-ANG.Rad.UserAngFile",
-        str(angles),
-        "-ANG.Thetas",
-        f"{case.sza:.6f}",
-        "-ANG.Log",
-        "angles.log",
-        "-SOS.View",
-        "1",
-        "-SOS.View.Phi",
-        f"{case.raa:.6f}",
-        "-SOS.IGmax",
-        str(N_ORDERS),
-        "-SOS.Ipolar",
-        "1",
-        "-SOS.ResFileUp",
-        "up.txt",
-        "-SOS.ResFileDown",
-        "down.txt",
-        "-SOS.Trans",
-        "trans.txt",
-        "-SOS.Flux",
-        "flux.txt",
-        "-SOS.Log",
-        "sos.log",
+    # One flag per line, with its value: SOS takes about forty of them,
+    # and a flat list hides which value belongs to which flag.
+    flags = {
+        "-SOS_Main.Wa": f"{case.wl_nm / 1000.0:.6f}",
+        "-SOS_Main.ResRoot": str(workdir),
+        "-SOS_Main.Log": "main.log",
+        "-ANG.Rad.NbGauss": str(N_GAUSS_RAD),
+        "-ANG.Aer.NbGauss": str(N_GAUSS_AER),
+        "-ANG.Rad.UserAngFile": str(angles),
+        "-ANG.Thetas": f"{case.sza:.6f}",
+        "-ANG.Log": "angles.log",
+        "-SOS.View": "1",
+        "-SOS.View.Phi": f"{case.raa:.6f}",
+        "-SOS.IGmax": str(N_ORDERS),
+        "-SOS.Ipolar": "1",
+        "-SOS.ResFileUp": "up.txt",
+        "-SOS.ResFileDown": "down.txt",
+        "-SOS.Trans": "trans.txt",
+        "-SOS.Flux": "flux.txt",
+        "-SOS.Log": "sos.log",
         # No gas absorption: the two codes are being compared on how they
         # transport scattered light, and their gas profiles are unrelated.
-        "-AP.AbsProfile.Type",
-        "7",
-        "-AP.MOT",
-        f"{case.mot:.8f}",
-        "-AP.HR",
-        f"{case.mol_scale_height:.4f}",
-        "-AP.AerProfile.Type",
-        "1",
-        "-AP.AerHS.HA",
-        f"{case.aer_scale_height:.4f}",
-        "-AP.Log",
-        "profile.log",
-        "-SURF.Dir",
-        str(workdir / "SURF"),
-        "-SURF.Type",
-        "0",
-        "-SURF.Alb",
-        f"{case.albedo:.6f}",
-        "-SURF.Log",
-        "surf.log",
-    ]
+        "-AP.AbsProfile.Type": "7",
+        "-AP.MOT": f"{case.mot:.8f}",
+        "-AP.HR": f"{case.mol_scale_height:.4f}",
+        "-AP.AerProfile.Type": "1",
+        "-AP.AerHS.HA": f"{case.aer_scale_height:.4f}",
+        "-AP.Log": "profile.log",
+        "-SURF.Dir": str(workdir / "SURF"),
+        "-SURF.Type": "0",
+        "-SURF.Alb": f"{case.albedo:.6f}",
+        "-SURF.Log": "surf.log",
+    }
 
     if case.aerosol is None:
         # SOS-ABS carries no -AP.AOT: the load is set by -AER.AOTref
         # alone, and zero there is a purely molecular atmosphere.
-        argv += ["-AER.AOTref", "0.0"]
+        flags["-AER.AOTref"] = "0.0"
     else:
         extdata = case.aerosol.write_sos_extdata(workdir / "extdata.txt")
-        argv += [
-            "-AER.DirMie",
-            str(workdir / "MIE"),
-            "-AER.Model",
-            "4",
-            "-AER.ExtData",
-            str(extdata),
-            "-AER.Waref",
-            f"{case.wl_nm / 1000.0:.6f}",
-            "-AER.AOTref",
-            f"{case.aot:.8f}",
+        flags |= {
+            "-AER.DirMie": str(workdir / "MIE"),
+            "-AER.Model": "4",
+            "-AER.ExtData": str(extdata),
+            "-AER.Waref": f"{case.wl_nm / 1000.0:.6f}",
+            "-AER.AOTref": f"{case.aot:.8f}",
             # Truncation renormalises the phase function and the optical
             # depth with it, which would break tdir = exp(-tau/mu).
-            "-AER.Tronca",
-            "0",
-            "-AER.ResFile",
-            "aer.txt",
-            "-AER.Log",
-            "aer.log",
-        ]
+            "-AER.Tronca": "0",
+            "-AER.ResFile": "aer.txt",
+            "-AER.Log": "aer.log",
+        }
+
+    argv = [str(executable()), *(word for pair in flags.items() for word in pair)]
 
     # SOS reads SOS_ABS_ROOT itself, to locate the data it ships with.
     # Without it SOS_AEROSOLS stops at ERROR_925, having already written
@@ -368,19 +283,9 @@ def run(case: SosCase, workdir: Path) -> SosResult:
 
 
 def _parse_trans(text: str, vza: tuple[float, ...]) -> SosResult:
-    """Read the direct and diffuse transmittances SOS prints.
+    """Read the transmittances out of the ``-SOS.Trans`` file.
 
-    Parameters
-    ----------
-    text : str
-        Contents of the ``-SOS.Trans`` file.
-    vza : tuple of float
-        Angles to pick out of the upward table.
-
-    Returns
-    -------
-    SosResult
-        Filled except for the flux and radiance fields.
+    The result is filled except for its flux and radiance fields.
     """
     direct = _one_float(text, r"Direct transmission TOA -> surface\s*:\s*([-\d.E+]+)")
     td_s = _one_float(text, r"thetas\s*=\s*[-\d.]+\s+td\(thetas\)\s*=\s*([-\d.E+]+)")
@@ -398,23 +303,9 @@ def _parse_trans(text: str, vza: tuple[float, ...]) -> SosResult:
 
 
 def _parse_flux(text: str, result: SosResult) -> None:
-    """Read the fluxes and the total optical depth into *result*.
-
-    Parameters
-    ----------
-    text : str
-        Contents of the ``-SOS.Flux`` file.
-    result : SosResult
-        Updated in place.
-    """
-    result.flux_down_direct = _one_float(
-        text, r"Downward direct flux at BOA\s*:\s*([-\d.E+]+)"
-    )
+    """Read the ``-SOS.Flux`` file into *result*, in place."""
     result.flux_down_diffuse = _one_float(
         text, r"Downward diffuse flux at BOA\s*:\s*([-\d.E+]+)"
-    )
-    result.flux_up_diffuse = _one_float(
-        text, r"Upward diffuse flux at TOA[^:]*:\s*([-\d.E+]+)"
     )
     # The profile table repeats one row per layer; every row carries the
     # column-integrated depth, so the first is enough.
@@ -439,14 +330,7 @@ def _parse_radiance(text: str, case: SosCase, result: SosResult) -> None:
     is the azimuth given by ``-SOS.View.Phi``, a negative one that
     azimuth plus 180 degrees.  This reads the positive side.
 
-    Parameters
-    ----------
-    text : str
-        Contents of the ``-SOS.ResFileUp`` file.
-    case : SosCase
-        The case, for the solar angle.
-    result : SosResult
-        Updated in place.
+    *result* is updated in place.
     """
     rows: dict[float, float] = {}
     scattering: dict[float, float] = {}
@@ -471,18 +355,6 @@ def _parse_radiance(text: str, case: SosCase, result: SosResult) -> None:
 def _one_float(text: str, pattern: str) -> float:
     """Return the single float *pattern* captures in *text*.
 
-    Parameters
-    ----------
-    text : str
-        Text to search.
-    pattern : str
-        Regular expression with one capturing group.
-
-    Returns
-    -------
-    float
-        The captured value.
-
     Raises
     ------
     SosError
@@ -499,21 +371,8 @@ def _nearest(table: dict[float, float], angle: float, what: str) -> float:
 
     The tolerance is what turns a silently wrong angle into a failure:
     a user angle SOS did not honour would otherwise be answered with its
-    nearest Gauss node, degrees away.
-
-    Parameters
-    ----------
-    table : dict
-        Angle to value.
-    angle : float
-        Angle wanted, in degrees.
-    what : str
-        Name of the quantity, for the error message.
-
-    Returns
-    -------
-    float
-        The value at *angle*.
+    nearest Gauss node, degrees away.  *what* names the quantity in the
+    error message.
 
     Raises
     ------

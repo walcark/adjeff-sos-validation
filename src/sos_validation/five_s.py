@@ -94,22 +94,8 @@ class FiveS:
     sca_ang: float
 
     def as_dict(self) -> dict[str, float]:
-        """Return the six quantities under the names adjeff writes.
-
-        Returns
-        -------
-        dict
-            Keys ``tdir_down``, ``tdif_down``, ``tdir_up``, ``tdif_up``,
-            ``rho_atm`` and ``sph_alb``.
-        """
-        return {
-            "tdir_down": self.tdir_down,
-            "tdif_down": self.tdif_down,
-            "tdir_up": self.tdir_up,
-            "tdif_up": self.tdif_up,
-            "rho_atm": self.rho_atm,
-            "sph_alb": self.sph_alb,
-        }
+        """Return the six `QUANTITIES`, under the names adjeff writes."""
+        return {q: getattr(self, q) for q in QUANTITIES}
 
 
 def five_s(

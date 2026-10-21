@@ -113,7 +113,7 @@ def _table(header: list[str], rows: list[list[str]]) -> list[str]:
     ]
 
 
-def _meaningful(point: Point, quantity: str) -> bool:
+def meaningful(point: Point, quantity: str) -> bool:
     """Return whether a relative difference on *quantity* means anything."""
     return bool(np.isfinite(point.relative(quantity))) and (
         abs(point.sos[quantity]) > FLOOR
@@ -159,7 +159,7 @@ def report(
     lines.append(WORST_NOTE.format(floor=FLOOR))
     worst = []
     for q in QUANTITIES:
-        above = [p for p in points if _meaningful(p, q)]
+        above = [p for p in points if meaningful(p, q)]
         rel = max(above, key=lambda p: abs(p.relative(q))) if above else None
         absolute = max(points, key=lambda p: abs(p.absolute(q)))
         worst.append(
@@ -212,7 +212,7 @@ def report(
     )
 
     above_floor = [
-        abs(p.relative(q)) for p in points for q in QUANTITIES if _meaningful(p, q)
+        abs(p.relative(q)) for p in points for q in QUANTITIES if meaningful(p, q)
     ]
     lines.append(
         MEDIAN_NOTE.format(

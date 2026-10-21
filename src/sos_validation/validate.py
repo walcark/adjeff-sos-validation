@@ -13,6 +13,10 @@ Five sweeps, each moving one thing away from a reference point:
            in a mixture is sensitive to
 =========  ====================================================
 
+The ``href`` sweep doubles as a check on SOS's vertical resolution: it
+is where a too-coarse SOS shows itself, as a bias on ``rho_atm`` that
+closes only at the molecular scale height.  See ``README.md``.
+
 Each is run over three atmospheres, because a disagreement in the mixed
 one says nothing about where it comes from:
 
@@ -41,7 +45,7 @@ from pathlib import Path
 import xarray as xr
 from adjeff.core import S2Band
 
-from . import adjeff_side, atmosphere, sos
+from . import adjeff_side, sos
 from .five_s import QUANTITIES, FiveS, five_s
 from .optics import AerosolOptics
 from .report import Point, report
@@ -107,7 +111,7 @@ def sos_point(
     params: Params,
     molecules: bool,
     aerosol: bool,
-    depths: atmosphere.Depths,
+    depths: adjeff_side.Depths,
     workdir: Path,
 ) -> FiveS:
     """Run SOS at *params*, through the optical depths adjeff computed.
@@ -140,8 +144,10 @@ def sos_point(
     return five_s(case, params.vza, workdir)
 
 
-def adjeff_points(sweep: str, molecules: bool, aerosol: bool) -> xr.Dataset:
-    """Run adjeff once over a whole sweep.
+def adjeff_points(
+    sweep: str, molecules: bool, aerosol: bool, base: Params = BASE
+) -> xr.Dataset:
+    """Run adjeff once over a whole sweep, through *base*'s other values.
 
     ``aerosol=False`` is expressed as a negligible AOT, which is what
     adjeff offers.
@@ -167,20 +173,28 @@ def adjeff_points(sweep: str, molecules: bool, aerosol: bool) -> xr.Dataset:
 
     return adjeff_side.run(
         bands=list(BANDS) if sweep == "wl" else [BASE_BAND],
-        aot=pick("aot", BASE.aot if aerosol else 1e-9),
-        sza=pick("sza", BASE.sza),
-        vza=pick("vza", BASE.vza),
-        raa=BASE.raa,
-        rh=BASE.rh,
-        href=pick("href", BASE.href),  # type: ignore[arg-type]
-        species=BASE.species,
+        aot=pick("aot", base.aot if aerosol else 1e-9),
+        sza=pick("sza", base.sza),
+        vza=pick("vza", base.vza),
+        raa=base.raa,
+        rh=base.rh,
+        href=pick("href", base.href),  # type: ignore[arg-type]
+        species=base.species,
         remove_rayleigh=not molecules,
         n_photons=N_PHOTONS,
     )
 
 
-def collect(sweeps: list[str], atmospheres: list[str], workdir: Path) -> list[Point]:
+def collect(
+    sweeps: list[str],
+    atmospheres: list[str],
+    workdir: Path,
+    base: Params = BASE,
+) -> list[Point]:
     """Run both codes over the requested sweeps and atmospheres.
+
+    Every sweep passes through *base*, so moving its reference point is
+    how a bias found at one of them is checked at another.
 
     Returns
     -------
@@ -196,15 +210,15 @@ def collect(sweeps: list[str], atmospheres: list[str], workdir: Path) -> list[Po
                 continue
             varied, values = SWEEPS[sweep]
             started = time.monotonic()
-            batched = adjeff_points(sweep, molecules, aerosol)
+            batched = adjeff_points(sweep, molecules, aerosol, base)
             print(
                 f"adjeff {name:9s} {sweep:4s} {time.monotonic() - started:6.1f}s",
                 flush=True,
             )
 
             for value in values:
-                params = replace(BASE, **{varied: value})
-                depths = atmosphere.depths(
+                params = replace(base, **{varied: value})
+                depths = adjeff_side.depths(
                     wl_nm=params.wl_nm,
                     aot=params.aot if aerosol else 0.0,
                     rh=params.rh,
@@ -251,6 +265,17 @@ def collect(sweeps: list[str], atmospheres: list[str], workdir: Path) -> list[Po
     return points
 
 
+def gauss_count(text: str) -> int:
+    """Return a Gauss angle count SOS was compiled to accept."""
+    count = int(text)
+    if not 1 <= count <= sos.MAX_GAUSS:
+        raise argparse.ArgumentTypeError(
+            f"SOS allows 1 to {sos.MAX_GAUSS} Gauss angles; beyond that it "
+            "stops on ERROR_4000 rather than overrunning its tables"
+        )
+    return count
+
+
 def main() -> None:
     """Parse the command line, run the comparison, write the report."""
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
@@ -265,12 +290,22 @@ def main() -> None:
     )
     parser.add_argument(
         "--gauss",
-        type=int,
+        type=gauss_count,
         default=sos.N_GAUSS_RAD,
         help=(
             f"Gauss angles SOS projects the phase function onto, at most "
-            f"{sos.MAX_GAUSS_RAD}; two runs at two values separate SOS's "
+            f"{sos.MAX_GAUSS}; two runs at two values separate SOS's "
             "angular resolution from a real disagreement."
+        ),
+    )
+    parser.add_argument(
+        "--href",
+        type=float,
+        default=BASE.href,
+        help=(
+            "aerosol scale height every sweep passes through, in km; 8 is "
+            "where it equals the molecular one and the mixing ratio stops "
+            "varying with altitude"
         ),
     )
     parser.add_argument(
@@ -286,9 +321,11 @@ def main() -> None:
         help="directory report.md and report.json are written to",
     )
     args = parser.parse_args()
-    sos.set_gauss(args.gauss, min(args.gauss, sos.MAX_GAUSS_AER))
+    sos.N_GAUSS_RAD = sos.N_GAUSS_AER = args.gauss
 
-    points = collect(args.sweeps, args.atmospheres, args.workdir)
+    points = collect(
+        args.sweeps, args.atmospheres, args.workdir, replace(BASE, href=args.href)
+    )
     args.out.mkdir(parents=True, exist_ok=True)
     raw, md = args.out / "report.json", args.out / "report.md"
     raw.write_text(json.dumps([asdict(p) for p in points], indent=2) + "\n")
