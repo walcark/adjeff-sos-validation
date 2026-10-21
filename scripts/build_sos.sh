@@ -5,6 +5,12 @@
 # validation never reads (it runs without gas absorption), so the clone
 # is shallow and lives outside the work tree, under SOS_ROOT.
 #
+# The vertical resolution is raised before compiling.  SOS ships with
+# CTE_OS_NT_MIN at 100, and 101 layers are not enough when the
+# molecule-to-aerosol ratio varies with altitude: its path reflectance
+# is then 0.8 % off its own converged value.  SOS_LAYERS sets it; 500 is
+# what leaves 0.02 %, and CTE_OS_NT, the array bound, allows 600.
+#
 # Usage:
 #     pixi run build-sos
 #     SOS_ROOT=/somewhere pixi run build-sos
@@ -12,11 +18,15 @@
 set -euo pipefail
 
 SOS_ROOT="${SOS_ROOT:-$HOME/.cache/adjeff/sos}"
+SOS_LAYERS="${SOS_LAYERS:-500}"
 REPO="https://github.com/CNES/RadiativeTransferCode-SOS"
 EXE="$SOS_ROOT/exe/SOS_ABS_MAIN.exe"
 
-if [ -x "$EXE" ]; then
-    echo "sos: $EXE is already built"
+# An existing build is reused only if it has the layer count asked for:
+# a stock 100-layer SOS silently reads 0.8 % off on the path reflectance.
+if [ -x "$EXE" ] && grep -q "^#define CTE_OS_NT_MIN $SOS_LAYERS\$" \
+    "$SOS_ROOT/inc/SOS.h"; then
+    echo "sos: $EXE is already built, with $SOS_LAYERS layers"
     exit 0
 fi
 
@@ -28,6 +38,14 @@ fi
 
 command -v gfortran >/dev/null || {
     echo "sos: gfortran not found; run through 'pixi run build-sos'" >&2
+    exit 1
+}
+
+echo "sos: setting CTE_OS_NT_MIN to $SOS_LAYERS layers"
+sed -i -E "s/^#define CTE_OS_NT_MIN [0-9]+/#define CTE_OS_NT_MIN $SOS_LAYERS/" \
+    "$SOS_ROOT/inc/SOS.h"
+grep -q "^#define CTE_OS_NT_MIN $SOS_LAYERS\$" "$SOS_ROOT/inc/SOS.h" || {
+    echo "sos: could not set CTE_OS_NT_MIN in inc/SOS.h" >&2
     exit 1
 }
 
