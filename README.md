@@ -1,7 +1,7 @@
-# adjeff-sos-validation
+# Validation of the `adjeff` library with `SOS_ABS_V5.1`
 
->> [!note]
->> See [report.md](results/report.md) for the full comparisons.
+> [!note]
+> See [report.md](results/report.md) for the full comparisons.
 
 Validates the six radiative terms of the 5S model that [adjeff](https://github.com/walcark/Adjeff) computes with the Smart-G Monte Carlo code against [SOS](https://github.com/CNES/RadiativeTransferCode-SOS), the CNES successive-orders-of-scattering code MAJA's atmospheric lookup tables are built with: an independent method, and the reference the operational processor already uses.
 
