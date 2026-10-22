@@ -1,6 +1,6 @@
 """Drive the SOS executable and read back what it computed.
 
-SOS is run once per (atmosphere, geometry, surface albedo).  Four of the
+SOS is run once per (atmosphere, geometry, surface albedo). Four of the
 six 5S quantities come straight out of its ``-SOS.Trans`` file:
 
 ===================  =========================================
@@ -41,34 +41,16 @@ from .optics import AerosolOptics
 #: Where `scripts/build_sos.sh` puts the clone and the executable.
 SOS_ROOT = Path(os.environ.get("SOS_ROOT", Path.home() / ".cache/adjeff/sos"))
 
-#: Gauss angles for the radiance field and for the phase matrix.  The
-#: phase matrix is capped at 100 by ``CTE_MIE_NBMU_MAX``.  The radiance
-#: field looks capped at 80 by ``CTE_OS_NBMU_MAX``, but the real limit is
-#: 68: ``SOS_ANGLES`` derives ``OS_NS = 2 * NbGauss`` and checks it
-#: against ``CTE_OS_NS_MAX``, which ships at 136.  This is the
-#: resolution SOS projects the phase function onto, so it sets the floor
-#: on how well a forward peak can agree with Smart-G's 2000-point table.
-#: ``--gauss`` moves it, which is how the comparison tells its own
-#: resolution from a real disagreement.
+#: Maximum Gauss angles numbers
 N_GAUSS_RAD = 40
 N_GAUSS_AER = 40
-
-#: What the shipped ``inc/SOS.h`` allows for the radiance field; the
-#: phase matrix allows 100, which is never the binding limit.
 MAX_GAUSS = 68
 
-
-#: Rounding step of the diffuse transmittances SOS prints.  The
-#: transmission file writes them ``f7.4`` and the flux file ``f9.5``, so
-#: a value of 0.0007 carries one significant digit and a relative
-#: difference on it is meaningless.  Reported alongside, so a percentage
-#: can be read against what it is measured on.
+#: Rounding step of the diffuse transmittances SOS prints.
 TDIF_QUANTUM_TRANS = 0.5e-4
 TDIF_QUANTUM_FLUX = 0.5e-5
 
-#: Maximal scattering order.  The default is 100; at an optical depth
-#: below one the series converges in far fewer, and the cost of asking
-#: for more is nil.
+#: Maximal scattering order.
 N_ORDERS = 100
 
 
@@ -260,9 +242,6 @@ def run(case: SosCase, workdir: Path) -> SosResult:
 
     argv = [str(executable()), *(word for pair in flags.items() for word in pair)]
 
-    # SOS reads SOS_ABS_ROOT itself, to locate the data it ships with.
-    # Without it SOS_AEROSOLS stops at ERROR_925, having already written
-    # a plausible-looking log.
     env = dict(os.environ, SOS_ABS_ROOT=str(SOS_ROOT))
     proc = subprocess.run(argv, capture_output=True, text=True, cwd=workdir, env=env)
     trans = workdir / "SOS" / "trans.txt"

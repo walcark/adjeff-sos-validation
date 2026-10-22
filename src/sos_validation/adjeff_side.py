@@ -1,31 +1,4 @@
-"""Everything the comparison asks of adjeff: the depths, and the terms.
-
-Two things come from this side, and both have to be read from adjeff
-rather than reproduced:
-
-1. **The optical depths**, out of the Smart-G atmosphere adjeff builds,
-   then forced on SOS through ``-AP.MOT`` and ``-AER.AOTref``.  Matching
-   the depths by reproducing the Rayleigh formula on both sides would be
-   a second place to be wrong; reading one and imposing it on the other
-   leaves none.  `depths` also reports ``OD_g``, so the comparison can
-   assert there is no gas absorption rather than assume it: Smart-G only
-   absorbs through a k-distribution, which adjeff never asks for.
-2. **The six 5S terms**, out of `RadiativePipeline`.  One call per sweep
-   rather than one per point: the samplers batch over the atmospheric
-   dimensions, so a swept AOT costs one Smart-G run per quantity instead
-   of one per value.
-
-   Wavelength is the exception.  It is not an atmospheric dimension in
-   adjeff but a property of the band, carried by the `ImageDict` key, so
-   a wavelength sweep is a sweep over bands: the pipeline is handed all
-   of them at once and `run` reassembles the per-band results into a
-   ``wl`` dimension.  Passing several wavelengths to `SpectralConfig`
-   while handing the pipeline one band computes only that band's,
-   silently.
-
-The aerosol optics, the third thing both codes must agree on, are in
-:mod:`.optics`.
-"""
+"""Compute radiatives with adjeff and extract adjeff parametrisation."""
 
 from __future__ import annotations
 
@@ -40,10 +13,6 @@ from adjeff.modules.samplers import RadiativePipeline
 
 from .five_s import QUANTITIES
 
-#: The wavelength adjeff refers its AOT to, from
-#: `create_atmosphere(wl_ref_nm=...)`.  Not 550: an AOT of 0.2 means 0.2
-#: at 560 nm, so the depth SOS has to be given at another wavelength is
-#: not 0.2 either.
 WL_REF_NM = 560.0
 
 

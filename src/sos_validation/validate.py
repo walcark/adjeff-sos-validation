@@ -2,30 +2,28 @@
 
 Five sweeps, each moving one thing away from a reference point:
 
-=========  ====================================================
+=========  ===============================================================
 ``aot``    the aerosol load, at nadir
-``sza``    the solar angle, which ``tdir_down`` and
-           ``tdif_down`` follow
-``vza``    the viewing angle, which ``tdir_up`` and ``tdif_up``
-           follow
+``sza``    the solar angle, which ``tdir_down`` and ``tdif_down`` follow
+``vza``    the viewing angle, which ``tdir_up`` and ``tdif_up`` follow
 ``wl``     the wavelength, over the Sentinel-2 range
-``href``   the aerosol scale height, which only ``rho_atm``
-           in a mixture is sensitive to
-=========  ====================================================
+``href``   the aerosol scale height, which only ``rho_atm`` in a mixture
+           is sensitive to
+=========  ===============================================================
 
 The ``href`` sweep doubles as a check on SOS's vertical resolution: it
 is where a too-coarse SOS shows itself, as a bias on ``rho_atm`` that
-closes only at the molecular scale height.  See ``README.md``.
+closes only at the molecular scale height. See ``README.md``.
 
 Each is run over three atmospheres, because a disagreement in the mixed
 one says nothing about where it comes from:
 
-===============  ===================================================
+===============  =========================================================
 ``rayleigh``     molecules only, no phase function to interpolate
-``aerosol``      aerosol only, testing the scattering matrix both
-                 codes were handed
+``aerosol``      aerosol only, testing the scattering matrix both codes
+                 were handed
 ``both``         what a user actually runs
-===============  ===================================================
+===============  =========================================================
 
 Usage
 -----
@@ -50,9 +48,7 @@ from .five_s import QUANTITIES, FiveS, five_s
 from .optics import AerosolOptics
 from .report import Point, report
 
-#: Sentinel-2 bands the wavelength sweep runs over.  In adjeff a
-#: wavelength is a property of the band, so a wavelength sweep is a band
-#: sweep.
+#: Sentinel-2 bands the wavelength sweep runs over.
 BANDS = (S2Band.B01, S2Band.B03, S2Band.B04, S2Band.B8A, S2Band.B11)
 
 #: Band of every other sweep, 560 nm.
@@ -102,8 +98,8 @@ SKIP: set[tuple[str, str]] = {
     ("aerosol", "href"),
 }
 
-#: Photons per Monte-Carlo sampler: a tenth of adjeff's default, which
-#: puts the noise near 0.1 percent and a full run under an hour.
+#: Photons per Monte-Carlo sampler: a tenth of adjeff's default.
+#: Puts the noise near 0.1 percent and a full run under an hour.
 N_PHOTONS = int(2e6)
 
 

@@ -1,16 +1,10 @@
 """The aerosol optics both codes are given, read from one file.
 
-Smart-G reads a CAMS species from a look-up table under
-``SMARTG_DIR_AUXDATA``; SOS reads an external scattering matrix through
-``-AER.Model 4 -AER.ExtData``.  Handing SOS a table of its own, a WMO or
-Shettle & Fenn model, would compare two aerosol models rather than two
-radiative transfer methods.  So the same file feeds both, interpolated
-here exactly the way `smartg.atmosphere.AerOPAC` interpolates it:
-linearly in wavelength and in relative humidity, over the table nodes.
+Smart-G reads a CAMS species from a look-up table under ``SMARTG_DIR_AUXDATA``.
+SOS reads an external scattering matrix through ``-AER.Model 4 -AER.ExtData``.
+Handing SOS a table of its own (WMO or Shettle & Fenn model) would compare
+two aerosol models rather than two radiative transfer methods.
 
-The normalisation already agrees.  SOS projects ``F11`` on Legendre
-polynomials and expects ``(1/2) * integral F11 dmu = 1``, which is what
-MOPSMAP writes: measured at 1.000002 on the eight CAMS tables.
 """
 
 from __future__ import annotations
@@ -27,9 +21,7 @@ from numpy.typing import NDArray
 F11, F21, F33, F34, F22, F44 = range(6)
 
 #: SOS caps an external scattering matrix at 200 angles
-#: (``CTE_MAXNB_ANG_EXT`` in ``inc/SOS.h``), against the 2000 MOPSMAP
-#: writes.  It splines them onto its own Gauss grid anyway, so the loss
-#: is not 2000 to 200 but 2000 to the number of Gauss angles.
+# (``CTE_MAXNB_ANG_EXT`` in ``inc/SOS.h``)
 SOS_MAX_ANGLES = 200
 
 
@@ -144,9 +136,6 @@ class AerosolOptics:
 
         def at(values: NDArray[np.float64]) -> NDArray[np.float64]:
             """Interpolate a ``(hum, wav, ...)`` block at (rh, wl_nm)."""
-            # Smart-G interpolates on the float index of each axis, which
-            # `np.interp` reproduces: a fractional index linear in the
-            # coordinate is a linear interpolation in the coordinate.
             on_hum = _interp_axis(values, hum, rh, axis=0)
             return _interp_axis(on_hum, wav, wl_nm, axis=0)
 
@@ -162,9 +151,8 @@ class AerosolOptics:
             y = phase[term]
             if not logarithmic:
                 return np.interp(theta, theta_in, y)
-            # F11 spans four decades across the forward peak; interpolating
-            # its logarithm is what keeps the peak from being cut by the
-            # coarser grid.
+            # interpolating the logarithm of F11 is what keeps the peak from being
+            # cut by the coarser grid.
             return np.exp(np.interp(theta, theta_in, np.log(y)))
 
         terms = {
@@ -174,7 +162,7 @@ class AerosolOptics:
             "f33": resample(F33, logarithmic=False),
         }
         # Resampling 2000 angles onto 200 shifts the normalisation by a
-        # few 1e-4.  Scaling all four terms by the same factor restores
+        # few 1e-4. Scaling all four terms by the same factor restores
         # it without touching the ratios SOS actually reads.
         mu = np.cos(np.deg2rad(theta))
         scale = 1.0 / (0.5 * abs(np.trapezoid(terms["f11"], mu)))

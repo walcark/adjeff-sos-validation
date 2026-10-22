@@ -1,5 +1,8 @@
 # adjeff-sos-validation
 
+>> [!note]
+>> See [report.md](results/report.md) for the full comparisons.
+
 Validates the six radiative terms of the 5S model that [adjeff](https://github.com/walcark/Adjeff) computes with the Smart-G Monte Carlo code against [SOS](https://github.com/CNES/RadiativeTransferCode-SOS), the CNES successive-orders-of-scattering code MAJA's atmospheric lookup tables are built with: an independent method, and the reference the operational processor already uses.
 
 | Term | |
@@ -31,7 +34,7 @@ Signed median difference per term and per atmosphere, over the comparisons where
 | Aerosol only | -0.00 | -0.06 | +0.00 | +0.02 | -0.16 | -0.09 | 0.06 |
 | Both | -0.00 | -0.02 | +0.00 | +0.10 | -0.21 | -0.08 | 0.06 |
 
-The last column is the median of the absolute difference over all six terms. No term is systematically off in any atmosphere: every median is inside the 0.1 % Monte-Carlo noise except `rho_atm`, which is at twice it.
+The last column is the median of the absolute difference (in percent) over all six terms. No term is systematically off in any atmosphere: every median is inside the 0.1 % Monte-Carlo noise except `rho_atm`, which is at twice it.
 
 This holds only against an SOS compiled for 500 layers. Against SOS as it ships, the mixed-atmosphere column reads -0.94 % on `rho_atm` and 0.25 % overall, and [that gap is SOS's, not adjeff's](#sos-needs-more-layers-than-it-ships-with).
 
@@ -83,7 +86,7 @@ Both codes get the same atmosphere, so only the radiative transfer can differ:
 | Geometry | SOS gets `180 - raa`: adjeff's `raa = 0` is the hotspot, SOS's is 180. Every run checks this against the scattering angle SOS prints |
 | Vertical resolution | SOS is compiled for 500 layers, not the 100 it ships with, because 101 layers leave its own path reflectance 0.8 % off |
 
-SOS prints the four transmittances directly. `rho_atm` and `sph_alb` come from four SOS runs over Lambertian albedos, fitted to the 5S relation
+SOS prints the four transmittances directly. `rho_atm` and `sph_alb` come from four SOS runs over Lambertian albedos, fitted to the 5S relation:
 
 ```
 (rho_toa(A) - rho_atm) / A  =  T_down T_up  +  sph_alb (rho_toa(A) - rho_atm)
@@ -104,11 +107,11 @@ The score is `(adjeff - SOS) / SOS`, counted only where SOS gives more than 0.01
 
 An earlier run of this comparison, against SOS compiled as it ships, found a systematic -0.9 % on `rho_atm` in a mixed atmosphere and nowhere else: flat across AOT, solar angle, viewing angle and wavelength, absent over molecules alone and over aerosol alone, and vanishing when the aerosol scale height was raised to 8 km. It turned out to be SOS's own vertical discretisation, not a disagreement between the two codes.
 
-SOS cuts the column into layers of equal optical thickness and gives each one a single phase matrix, the Rayleigh and aerosol matrices mixed at that layer's local proportions (`PCAER`, `PCMOL` in its profile log, which run from 0.90 at the ground to 0 at the top for `HA = 2 km`). That is piecewise-constant in a quantity that varies continuously with altitude, so it converges only as the layers get thin. How many layers it uses is a compile-time constant: `CTE_OS_NT_MIN` in `inc/SOS.h`, which ships at 100 and gave 101 layers here.
+SOS cuts the column into layers of equal optical thickness and gives each one a single phase matrix, the Rayleigh and aerosol matrices mixed at that layer's local proportions (`PCAER`, `PCMOL` in its profile log, which run from 0.90 at the ground to 0 at the top for `HA = 2 km`). That is piecewise-constant in a quantity that varies continuously with altitude, so it converges only as the layers get thin. How many layers it uses is a compile-time constant: `CTE_OS_NT_MIN` in `inc/SOS.h`, which gave 101 layers for the tests we made.
 
-Running SOS against itself settles it. Same atmosphere, same geometry, same everything but the layer count, so neither adjeff nor Monte-Carlo noise is involved:
+Running SOS against with a changing compile-time constant allows to observe the impact of the discretisation:
 
-| `rho_atm` from SOS | 101 layers | 501 layers | Shift |
+| `rho_atm` from SOS | 101 layers | 501 layers | Difference |
 |---|---|---|---|
 | `HA = 2 km`, AOT 0.1 | 0.040075 | 0.039860 | **-0.54 %** |
 | `HA = 2 km`, AOT 0.2 | 0.045404 | 0.045046 | **-0.79 %** |
@@ -117,28 +120,15 @@ Running SOS against itself settles it. Same atmosphere, same geometry, same ever
 | `HA = 8 km`, AOT 0.2 | 0.045229 | 0.045230 | +0.001 % |
 | `HA = 8 km`, AOT 0.4 | 0.057102 | 0.057103 | +0.002 % |
 
-At `HA = HR = 8 km` the mixing ratio is the same at every altitude, SOS's per-layer mixture is exact, and 101 layers are already converged to 1e-5. As soon as the ratio varies, they are not, and the error is of the size and the sign of the gap that was attributed to adjeff:
+At `HA = HR = 8 km` the mixing ratio is the same at every altitude, and therefore the SOS per-layer mixture is exact. This is observed as 101 layers are already converged to 1e-5. As soon as the ratio varies, they are not, and the error is of the size and the sign of the gap that was attributed to adjeff:
 
 | `rho_atm`, `HA = 2 km`, AOT 0.2 | Value | adjeff vs SOS |
 |---|---|---|
 | adjeff | 0.045008 | |
-| SOS, 101 layers, as it ships | 0.045404 | **-0.87 %** |
+| SOS, 101 layers | 0.045404 | **-0.87 %** |
 | SOS, 501 layers | 0.045046 | **-0.08 %** |
 
 Extrapolating the two layer counts as an error in `1/N` leaves SOS 0.02 % from its own limit at 501 layers, so 0.045046 is the converged value and adjeff was the accurate one all along. Everything above is run against the 501-layer build, and the scale-height sweep that used to show the bias now shows nothing:
-
-| Aerosol scale height (km) | 0.5 | 1 | 2 | 4 | 8 |
-|---|---|---|---|---|---|
-| `rho_atm`, adjeff vs SOS, 501 layers (%) | -0.08 | -0.23 | -0.42 | -0.18 | +0.27 |
-| the same against SOS as it ships (%) | -1.26 | -1.15 | -0.87 | -1.04 | +0.16 |
-
-The second row is the trace the investigation started from: one sign throughout, and closing only at 8 km. The first is noise.
-
-Three other candidate causes were ruled out along the way, and are worth stating because they are the ones a reader will ask about first:
-
-- SOS's angular resolution: 68 Gauss angles instead of 40 change nothing.
-- The forward peak of the aerosol phase function: it is not truncated (`-AER.Tronca 0`).
-- The vertical profiles themselves: they are not merely similar but the same. SOS lays down `tau_R exp(-z/8)` and `tau_A exp(-z/HA)`; reading the Smart-G atmosphere adjeff builds back, the fraction of each column above `z` matches those exponentials to the fourth decimal for the aerosol and to 0.2 % for the molecules. Neither the shape of the profiles nor the altitude of one component relative to the other was ever in question.
 
 ## Layout
 

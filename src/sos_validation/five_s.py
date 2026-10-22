@@ -1,7 +1,7 @@
 r"""The six 5S quantities, from SOS runs at several surface albedos.
 
-SOS prints four of them.  The two it does not, ``rho_atm`` and
-``sph_alb``, are read out of the 5S relation itself,
+SOS prints four of them. The two it does not (``rho_atm`` and ``sph_alb``)
+are read out of the 5S relation itself,
 
 .. math::
     \rho_\mathrm{toa}(A) = \rho_\mathrm{atm}
@@ -16,17 +16,8 @@ A black ground gives ``rho_atm`` directly.  Rearranged for the others,
           - \rho_\mathrm{atm})
 
 which is a straight line in ``rho_toa(A) - rho_atm``: its slope is the
-spherical albedo and its intercept the two-way transmittance.  Three
-albedos make the line overdetermined, and the residual of the fit is
-reported.  It is not a free parameter of the comparison but a test of it:
-the 5S form is exact over a uniform Lambertian surface, so a residual
-above the noise would mean the runs do not describe the atmosphere the
-inversion assumes.
+spherical albedo and its intercept the two-way transmittance.
 
-The transmittance that comes out is a second, independent reading of
-``(tdir_down + tdif_down) * (tdir_up + tdif_up)``, which SOS already
-printed term by term.  The two agreeing is what says the inversion is
-sound before its ``sph_alb`` is trusted.
 """
 
 from __future__ import annotations
@@ -38,7 +29,7 @@ import numpy as np
 
 from .sos import SosCase, SosResult, run
 
-#: The six quantities of the 5S model, under the names adjeff writes.
+#: The six quantities of the 5S model
 QUANTITIES = (
     "tdir_down",
     "tdif_down",
@@ -49,8 +40,7 @@ QUANTITIES = (
 )
 
 #: Surface albedos to invert over.  Zero isolates ``rho_atm``; the rest
-#: span the range a land scene reaches, and being spread out is what
-#: conditions the fit.
+#: span the range a land scene reaches
 ALBEDOS = (0.0, 0.2, 0.5, 0.8)
 
 

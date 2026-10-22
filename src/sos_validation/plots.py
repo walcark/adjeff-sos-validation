@@ -36,23 +36,15 @@ from matplotlib.lines import Line2D  # noqa: E402
 from .five_s import QUANTITIES  # noqa: E402
 from .report import FLOOR, Point, meaningful  # noqa: E402
 
-#: The SciencePlots sheets.  ``no-latex`` spares a TeX install; drop it
-#: for TeX-rendered text.  Set for the module: every figure here is
-#: drawn in this style, and nothing else imports this one.
 SHEETS = ["science", "no-latex"]
 plt.style.use(SHEETS)
 
-#: Atmosphere to ``(label, colour, marker)``, colours from SciencePlots'
-#: ``vibrant``.  Colour and shape both carry identity, so the figures read
-#: in greyscale and for any vision; markers are hollow, so overlapping
-#: points of different atmospheres stay visible.
 STYLE = {
     "rayleigh": ("Molecules only", "#0077BB", "o"),
     "aerosol": ("Aerosol only", "#EE7733", "s"),
     "both": ("Molecules and aerosol", "#EE3377", "D"),
 }
 
-#: Sweep to its axis label.
 SWEEP_LABELS = {
     "aot": "AOT at 560 nm",
     "sza": "Solar zenith angle (°)",
@@ -62,8 +54,7 @@ SWEEP_LABELS = {
 }
 
 #: The relative-difference axis of `by_sweep`, in percent; beyond it a
-#: point is drawn on the edge, as a triangle pointing out.  No
-#: atmosphere uses the triangle, so the two cannot be confused.
+#: point is drawn on the edge, as a triangle pointing out
 LIMIT = 3.0
 
 INK = "#0b0b0b"
