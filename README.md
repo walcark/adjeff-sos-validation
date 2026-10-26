@@ -3,7 +3,7 @@
 > [!note]
 > See [report.md](results/report.md) for the full comparisons.
 
-Validates the six radiative terms of the 5S model that [adjeff](https://github.com/walcark/Adjeff) computes with the Smart-G Monte Carlo code against [SOS](https://github.com/CNES/RadiativeTransferCode-SOS), the CNES successive-orders-of-scattering code MAJA's atmospheric lookup tables are built with: an independent method, and the reference the operational processor already uses.
+This repository is made to validate the six radiative terms of the 5S model that [adjeff](https://github.com/walcark/Adjeff) computes with the Smart-G Monte Carlo code against [SOS](https://github.com/CNES/RadiativeTransferCode-SOS), the CNES successive-orders-of-scattering code.
 
 | Term | |
 |---|---|
@@ -24,9 +24,9 @@ Median relative difference over 339 comparisons: **0.06 %**.
 | `tdif_down` | 1.13 % | aerosol only, 1610 nm |
 | `tdif_up` | 0.52 % | mixed, 665 nm |
 
-Five sweeps (AOT, solar angle, viewing angle, wavelength, aerosol scale height) over three atmospheres (molecules only, aerosol only, both). The full tables are in [`results/report.md`](results/report.md), every number in [`results/report.json`](results/report.json).
+Atmospheres were computed for several different parameters (AOT, solar angle, viewing angle, wavelength, aerosol scale height), over three atmospheres (molecules only, aerosol only, both). The full tables are in [`results/report.md`](results/report.md), every number in [`results/report.json`](results/report.json).
 
-Signed median difference per term and per atmosphere, over the comparisons where SOS gives more than 0.01, in percent:
+The signed median difference per term and per atmosphere is given below (in %):
 
 | Atmosphere | `tdir_down` | `tdif_down` | `tdir_up` | `tdif_up` | `rho_atm` | `sph_alb` | All terms |
 |---|---|---|---|---|---|---|---|
@@ -34,23 +34,26 @@ Signed median difference per term and per atmosphere, over the comparisons where
 | Aerosol only | -0.00 | -0.06 | +0.00 | +0.02 | -0.16 | -0.09 | 0.06 |
 | Both | -0.00 | -0.02 | +0.00 | +0.10 | -0.21 | -0.08 | 0.06 |
 
-The last column is the median of the absolute difference (in percent) over all six terms. No term is systematically off in any atmosphere: every median is inside the 0.1 % Monte-Carlo noise except `rho_atm`, which is at twice it.
+The last column is the median of the absolute difference (in %) over all six terms.
 
-This holds only against an SOS compiled for 500 layers. Against SOS as it ships, the mixed-atmosphere column reads -0.94 % on `rho_atm` and 0.25 % overall, and [that gap is SOS's, not adjeff's](#sos-needs-more-layers-than-it-ships-with).
+
+> [!note]
+> These values hold only against an SOS compiled for 500 vertical layers. If SOS is used with its default number of vertical layers, the error is significantly more important in average (0.25%).
+
 
 ![adjeff against SOS, one panel per term](results/figures/sos_vs_adjeff.png)
 
-Every point lies on `y = x`. The relative differences, over all 339 comparisons above the 0.01 floor:
+Every point is on `y = x`. The relative differences is provided below:
 
 ![Distribution of the relative differences per term](results/figures/relative_distribution.png)
 
-And against each swept parameter:
+The relative difference against each swept parameter is provided below:
 
 ![Relative difference against each swept parameter](results/figures/relative_by_sweep.png)
 
-## Running it
+## Running the comparison
 
-Needs a CUDA GPU for adjeff and the Smart-G auxiliary data.
+The run required a CUDA GPU for `adjeff` and the `Smart-G` auxiliary data.
 
 ```bash
 pixi install
@@ -65,13 +68,8 @@ pixi run plots                     # results/figures/, from results/report.json
 
 `build-sos` clones into `~/.cache/adjeff/sos`, or `SOS_ROOT`. The clone weighs 4.4 GB, 3.5 GB of which is an absorption database this validation does not read.
 
-Before compiling, it raises `CTE_OS_NT_MIN` in `inc/SOS.h` from the 100 SOS ships with to 500, which is what makes SOS's own vertical discretisation converge (see [below](#sos-needs-more-layers-than-it-ships-with)). `SOS_LAYERS` overrides it; `CTE_OS_NT`, the array bound, allows 600.
+Before compiling, it raises `CTE_OS_NT_MIN` in `inc/SOS.h` from the 100 SOS default to 500, which is what makes SOS's own vertical discretisation converge.
 
-The offline tests need neither SOS, adjeff nor a GPU:
-
-```bash
-pixi run -e cpu test
-```
 
 ## Method
 
@@ -102,33 +100,6 @@ The score is `(adjeff - SOS) / SOS`, counted only where SOS gives more than 0.01
 - **SOS's printed precision.** SOS prints its diffuse transmittances to four decimals. Over molecules alone at 1610 nm, `tdif_up` is 0.0006, so rounding alone is worth 8 %; this is why the 0.01 floor exists. `tdif_down` is read from the flux file, which has one more decimal.
 - **SOS's vertical resolution is a build-time choice.** SOS as it ships is 0.8 % from its own converged path reflectance in a mixed atmosphere, so `build-sos` recompiles it with 500 layers. Comparing against a stock SOS reproduces that 0.8 % and reads it as an adjeff error; [the section below](#sos-needs-more-layers-than-it-ships-with) is how it was found.
 - **Scope.** The comparison covers Lambertian surfaces, no gas absorption, and one CAMS species (sulphate, 50 % humidity): SOS reads one scattering matrix, so a mix of species is not compared.
-
-## SOS needs more layers than it ships with
-
-An earlier run of this comparison, against SOS compiled as it ships, found a systematic -0.9 % on `rho_atm` in a mixed atmosphere and nowhere else: flat across AOT, solar angle, viewing angle and wavelength, absent over molecules alone and over aerosol alone, and vanishing when the aerosol scale height was raised to 8 km. It turned out to be SOS's own vertical discretisation, not a disagreement between the two codes.
-
-SOS cuts the column into layers of equal optical thickness and gives each one a single phase matrix, the Rayleigh and aerosol matrices mixed at that layer's local proportions (`PCAER`, `PCMOL` in its profile log, which run from 0.90 at the ground to 0 at the top for `HA = 2 km`). That is piecewise-constant in a quantity that varies continuously with altitude, so it converges only as the layers get thin. How many layers it uses is a compile-time constant: `CTE_OS_NT_MIN` in `inc/SOS.h`, which gave 101 layers for the tests we made.
-
-Running SOS against with a changing compile-time constant allows to observe the impact of the discretisation:
-
-| `rho_atm` from SOS | 101 layers | 501 layers | Difference |
-|---|---|---|---|
-| `HA = 2 km`, AOT 0.1 | 0.040075 | 0.039860 | **-0.54 %** |
-| `HA = 2 km`, AOT 0.2 | 0.045404 | 0.045046 | **-0.79 %** |
-| `HA = 2 km`, AOT 0.4 | 0.057258 | 0.056635 | **-1.09 %** |
-| `HA = 8 km`, AOT 0.1 | 0.039916 | 0.039916 | +0.000 % |
-| `HA = 8 km`, AOT 0.2 | 0.045229 | 0.045230 | +0.001 % |
-| `HA = 8 km`, AOT 0.4 | 0.057102 | 0.057103 | +0.002 % |
-
-At `HA = HR = 8 km` the mixing ratio is the same at every altitude, and therefore the SOS per-layer mixture is exact. This is observed as 101 layers are already converged to 1e-5. As soon as the ratio varies, they are not, and the error is of the size and the sign of the gap that was attributed to adjeff:
-
-| `rho_atm`, `HA = 2 km`, AOT 0.2 | Value | adjeff vs SOS |
-|---|---|---|
-| adjeff | 0.045008 | |
-| SOS, 101 layers | 0.045404 | **-0.87 %** |
-| SOS, 501 layers | 0.045046 | **-0.08 %** |
-
-Extrapolating the two layer counts as an error in `1/N` leaves SOS 0.02 % from its own limit at 501 layers, so 0.045046 is the converged value and adjeff was the accurate one all along. Everything above is run against the 501-layer build, and the scale-height sweep that used to show the bias now shows nothing:
 
 ## Layout
 
