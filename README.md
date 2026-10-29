@@ -1,9 +1,6 @@
 # Validation of the `adjeff` library with `SOS_ABS_V5.1`
 
-The [adjeff](https://github.com/walcark/Adjeff) code computes radiative parameters with the Smart-G Monte Carlo code. This repository aims to compare those computations against [SOS](https://github.com/CNES/RadiativeTransferCode-SOS), the CNES successive-orders-of-scattering code.
-
-> [!note]
-> See [report.md](results/report.md) for the full comparisons.
+The [adjeff](https://github.com/walcark/Adjeff) code computes radiative parameters with the Smart-G Monte Carlo code. This repository aims to compare those computations against [SOS](https://github.com/CNES/RadiativeTransferCode-SOS), the CNES successive-orders-of-scattering code. Atmospheres were computed for several different atmospheric variables (AOT, solar angle, viewing angle, wavelength, aerosol scale height), over three atmospheres types (molecules only, aerosol only, both). The full tables are in [`results/report.md`](results/report.md), every number in [`results/report.json`](results/report.json).
 
 ## Running the comparison
 
@@ -22,25 +19,21 @@ pixi run plots                     # results/figures/, from results/report.json
 
 The median relative difference over 339 comparisons is **0.06 %** on average over the six parameters.
 
-| Term | Worst relative difference | Where |
-|---|---|---|
-| `tdir_down`, `tdir_up` | 0.01 % | |
-| `rho_atm` | 0.74 % | aerosol only, `sza = 70` |
-| `sph_alb` | 0.84 % | aerosol only, 665 nm |
-| `tdif_down` | 1.13 % | aerosol only, 1610 nm |
-| `tdif_up` | 0.52 % | mixed, 665 nm |
-
-Atmospheres were computed for several different atmospheric variables (AOT, solar angle, viewing angle, wavelength, aerosol scale height), over three atmospheres types (molecules only, aerosol only, both). The full tables are in [`results/report.md`](results/report.md), every number in [`results/report.json`](results/report.json).
+| Term | Worst relative difference |
+|---|---|
+| `tdir_down`, `tdir_up` | 0.01 % |
+| `rho_atm` | 0.74 % |
+| `sph_alb` | 0.84 % |
+| `tdif_down` | 1.13 % |
+| `tdif_up` | 0.52 % |
 
 The signed median difference per term and per atmosphere is given below (in %):
 
-| Atmosphere | `tdir_down` | `tdif_down` | `tdir_up` | `tdif_up` | `rho_atm` | `sph_alb` | All terms |
-|---|---|---|---|---|---|---|---|
-| Molecules only | +0.00 | -0.00 | +0.00 | -0.02 | +0.12 | -0.14 | 0.05 |
-| Aerosol only | -0.00 | -0.06 | +0.00 | +0.02 | -0.16 | -0.09 | 0.06 |
-| Both | -0.00 | -0.02 | +0.00 | +0.10 | -0.21 | -0.08 | 0.06 |
-
-The last column is the median of the absolute difference (in %) over all six terms.
+| Atmosphere | `tdir_down` | `tdif_down` | `tdir_up` | `tdif_up` | `rho_atm` | `sph_alb` |
+|---|---|---|---|---|---|---|
+| Molecules only | +0.00 | -0.00 | +0.00 | -0.02 | +0.12 | -0.14 |
+| Aerosol only | -0.00 | -0.06 | +0.00 | +0.02 | -0.16 | -0.09 |
+| Both | -0.00 | -0.02 | +0.00 | +0.10 | -0.21 | -0.08 |
 
 > [!note]
 > These values hold only against an SOS compiled for 500 vertical layers. If SOS is used with its default number of vertical layers, the error is significantly more important in average (0.25%).
