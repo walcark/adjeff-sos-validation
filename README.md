@@ -1,16 +1,22 @@
 # Validation of the `adjeff` library with `SOS_ABS_V5.1`
 
+The [adjeff](https://github.com/walcark/Adjeff) code computes radiative parameters with the Smart-G Monte Carlo code. This repository aims to compare those computations against [SOS](https://github.com/CNES/RadiativeTransferCode-SOS), the CNES successive-orders-of-scattering code.
+
 > [!note]
 > See [report.md](results/report.md) for the full comparisons.
 
-This repository is made to validate the six radiative terms of the 5S model that [adjeff](https://github.com/walcark/Adjeff) computes with the Smart-G Monte Carlo code against [SOS](https://github.com/CNES/RadiativeTransferCode-SOS), the CNES successive-orders-of-scattering code.
+## Running the comparison
 
-| Term | |
-|---|---|
-| `tdir_down`, `tdif_down` | Direct and diffuse transmittances, sun to surface |
-| `tdir_up`, `tdif_up` | Direct and diffuse transmittances, surface to sensor |
-| `rho_atm` | Path reflectance |
-| `sph_alb` | Spherical albedo |
+The run requires a CUDA GPU for `adjeff` and the `Smart-G` auxiliary data.
+
+```bash
+pixi install
+pixi run build-sos                 # clone and compile SOS, once
+export SMARTG_DIR_AUXDATA=/path/to/smartg/auxdata
+pixi run validate                  # about 30 minutes; writes results/report.*
+pixi run validate --sweeps aot --atmospheres aerosol
+pixi run plots                     # results/figures/, from results/report.json
+```
 
 ## Results
 
@@ -48,19 +54,6 @@ Every point is on `y = x`. The relative differences is provided below:
 The relative difference against each swept parameter is provided below:
 
 ![Relative difference against each swept parameter](results/figures/relative_by_sweep.png)
-
-## Running the comparison
-
-The run requires a CUDA GPU for `adjeff` and the `Smart-G` auxiliary data.
-
-```bash
-pixi install
-pixi run build-sos                 # clone and compile SOS, once
-export SMARTG_DIR_AUXDATA=/path/to/smartg/auxdata
-pixi run validate                  # about 30 minutes; writes results/report.*
-pixi run validate --sweeps aot --atmospheres aerosol
-pixi run plots                     # results/figures/, from results/report.json
-```
 
 ## Method
 
